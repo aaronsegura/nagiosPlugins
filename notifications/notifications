@@ -1,0 +1,219 @@
+#!/usr/bin/php -q
+<?php
+
+define("CMDFILE", "/usr/local/groundwork/nagios/var/spool/nagios.cmd");
+define("STATEFILE", "/usr/local/groundwork/nagios/var/status.log");
+
+define("VERSION", "0.3");
+define("VERDATE", "11/03/2006");
+
+function usage($msg = NULL)
+{
+	global $argv0;
+
+	print(basename($argv0) ." v". VERSION ." (". VERDATE .") ");
+	print("by Aaron M. Segura (aaron.segura@gmail.com)\n");
+
+	print("\nUsage: ". basename($argv0) ." [host] [service] <on|off>\n");
+	print("\tHost and Service are optional.  If service is specified, however, host\n");
+	print("\tis REQUIRED.  If host and service are omitted, notifications will be\n");
+	print("\tGlobally turned on/off.  Otherwise, notifications will be turned\n");
+	print("\ton/off for the particular host/service specified. \n");
+
+	if ( strlen($msg) )
+		print("\n*** $msg\n\n");
+	
+	exit();
+}
+
+function get_nagios_status($file)
+{
+	$status = array();
+
+	if ( file_exists($file) )	
+	{
+		$data = @file($file);
+
+		if ( count($data) == 1 )
+			return(FALSE);
+
+		foreach ( $data as $line )
+		{
+			$line = rtrim($line);
+
+			if ( preg_match('/^[A-Za-z]* \{/', $line) )
+			{
+				// section header
+				$key = split(" ", $line);
+				$index = $key[0];
+			}
+			else
+				if ( preg_match('/[a-z_A-Z]+=/', $line) )
+				{
+					list($key, $val) = split("=", trim($line));
+
+					switch($index)
+					{
+						case "info":
+						case "program":
+							$status["$index"]["$key"] = $val;
+						break;
+
+						case "host":
+							if ( $key == "host_name" )
+							{
+								$status["hosts"][] = $val;
+								$status["$val"] = array();
+								$current_host = $val;
+							}
+							else
+								$status["$current_host"]["$key"] = $val;
+						break;
+
+						case "service":
+							switch($key)
+							{
+								case "host_name":
+									$current_host = $val;
+								break;
+
+								case "service_description":
+									$current_svc = $val;
+									$status["$current_host"]["services"][] = $val;
+									$status["$current_host"]["$val"] = array();
+								break;
+
+								default:
+									$status["$current_host"]["$current_svc"]["$key"] = $val;
+							}
+						break;	
+					}
+				}
+				else
+					if ( preg_match("/\}$/", $line) || preg_match("/^$/", $line) )
+						$current_host = $current_svc = NULL;
+		} // Foreach
+
+		return($status);
+
+	} // if (Status Log Exists)
+	else
+		return(NULL);
+} // end function
+
+	//
+	// main()
+	// 
+
+	// Get current nagios status in order to check validity of 
+	// service/host names
+	
+	$nagios = get_nagios_status(STATEFILE);
+
+	if ( count($nagios) <= 1 )
+		usage("Unable to read nagios status from ". STATEFILE);
+
+	$argv0 = array_shift($_SERVER["argv"]);
+	switch($_SERVER["argc"])
+	{
+		case "1":
+			usage();
+		break;
+
+		case "2":
+			// Global
+			$type = "GLOBAL";
+			$newstate = array_shift($_SERVER["argv"]);
+		break;
+
+		case "3":
+			// Host
+			$type = "HOST";
+			$host = array_shift($_SERVER["argv"]);
+			$newstate = array_shift($_SERVER["argv"]);
+
+			if ( ! @in_array($host, $nagios["hosts"]) )
+				usage("Invalid hostname: $host");
+		break;
+
+		case "4":
+			// Service
+			$type = "SVC";
+			$host = array_shift($_SERVER["argv"]);
+			$service = array_shift($_SERVER["argv"]);
+			$newstate = array_shift($_SERVER["argv"]);
+
+			if ( ! @in_array($host, $nagios["hosts"]) )
+				usage("Invalid hostname: $host");
+
+			if ( (! @in_array($service, $nagios[$host]["services"])) && (!eregi("^all$", $service) ) )
+				usage("Invalid service for $host: $service");
+		break;
+
+		default:
+			usage();
+	}
+
+
+	switch($type)
+	{
+		case "HOST":
+			if ( eregi("^on$", $newstate) )
+				$cmd = "ENABLE_HOST_NOTIFICATIONS";
+			else if ( eregi("^off$", $newstate) )
+				$cmd = "DISABLE_HOST_NOTIFICATIONS";
+			else
+				usage("Invalid Notification State: $newstate");
+
+			$params = ";$host";
+
+		break;
+
+		case "SVC":
+			if ( eregi("^on$", $newstate) )
+				if ( eregi("^all$", $service) )
+				{
+					$cmd = "ENABLE_HOST_SVC_NOTIFICATIONS";
+					$params = ";$host";
+				}
+				else
+				{
+					$cmd = "ENABLE_SVC_NOTIFICATIONS";
+					$params = ";$host;$service";
+				}
+			else if ( eregi("^off$", $newstate) )
+				if ( eregi("^all$", $service) )
+				{		
+					$cmd = "DISABLE_HOST_SVC_NOTIFICATIONS";
+					$params = ";$host";
+				}
+				else
+				{
+					$cmd = "DISABLE_SVC_NOTIFICATIONS";
+					$params = ";$host;$service";
+				}	
+			else
+				usage("Invalid Notification State: $newstate");
+
+
+		break;
+
+		case "GLOBAL":
+			if ( eregi("^on$", $newstate) )
+				$cmd = "ENABLE_NOTIFICATIONS";
+			else if ( eregi("^off$", $newstate) )
+				$cmd = "DISABLE_NOTIFICATIONS";
+			else
+				usage("Invalid Notification State: $newstate");
+	}
+
+		
+	
+	if ( ($fp = @fopen(CMDFILE, "a")) === FALSE )
+		die("Could not open command file.  Check your permissions\n");
+	else
+	{
+		fwrite($fp, "[". time() ."] ${cmd}${params}\n");
+		fclose($fp);
+	}
+?>

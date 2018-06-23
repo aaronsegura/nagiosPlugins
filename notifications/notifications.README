@@ -1,0 +1,57 @@
+Turn on/off Notifications for Nagios hosts/services
+by Aaron Segura (aaron.segura@gmail.com)
+
+---------------------------------------
+
+Usage: notifications [host] [service] <on|off>
+
+---------------------------------------
+
+Revisions:
+
+* 0.2 11/02/2006
+      Initial Release
+
+* 0.3 11/03/2006
+	  Added "all" service parameter
+
+---------------------------------------
+
+INSTALLATION
+------------
+You will need to modify the "STATEFILE" definition at the top of the script
+to point to your nagios status.log file.  This file is used in order to 
+validate host and service names.
+
+Also modify the CMDFILE definition to point to your nagios.cmd file.
+
+
+USAGE
+-----
+There are three modes of operation:  Host, Service and Global.
+
+Global:
+# notifications on
+ -- will turn notifications on
+
+# notifications off
+ -- will turn notifications off
+
+Host:
+# notifications hostname off
+ -- turns off notifications for the particular host.  Note that this does
+    not turn off notifications for the services attached to that host, just
+    any host-based notifies.  (See below)
+
+Service:
+# notifications hostname servicename off
+ -- turns off notifications for the named service on the named host.
+
+# notifications hostname all off
+ -- turns off notifications for all services on the named host.
+
+*** All host and service names are checked against the status.log file to make
+    sure they actually exist before submitting the command to nagios.
+
+Questions, comments, flames -> aaron.segura@gmail.com
+

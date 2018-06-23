@@ -1,0 +1,75 @@
+Nagios Downtime Scheduler
+by Aaron Segura (aaron.segura@gmail.com) 07/13/2006
+
+Requires: php > 4.x, but may also work with earlier versions.
+Context: Goes great with cron-flakes...er, cron.
+
+-------------------------------------
+Usage: nagios_down.php [-H <s|h>]|-S <s|h>] [-g group] [-h host] [-s service] <-f|-d duration> <-b begin> <-e end> <-a author> <-c comment> [-n]
+-H      Schedule Downtime for "h"osts or "s"ervices in a specific HostGroup
+-S      Schedule Downtime for "h"osts or "s"ervices in a specific ServiceGroup
+-g      Host or Service Group associated with -H or -S request
+-h      Schedule downtime for host, except when used with -s.  Cannot be used with -H or -S
+-s      Schedule downtime for service, cannot be used with -H or -S.  May be "all" when used with -h.
+-f      Set a fixed schedule, otherwise downtime runs for <duration> seconds
+-d      Duration of downtime, in seconds.  Cannot be used with -f
+-b      Beginning of Downtime.
+-e      End of Downtime.
+-a      Author: Who is scheduling the downtime?
+-c      Comment: Reason for scheduling the downtime.
+-n      Dry run.  Don't actually schedule anything, but show what would have been scheduled.
+
+        -b and -e options can take any string recognized by PHP's strtotime function.
+        Example: "13:30 tomorrow", "Thursday", etc...
+        see http://www.php.net/manual/en/function.strtotime.php for details
+-------------------------------------
+
+Revisions:
+* 0.1	07/10/2006
+		Initial Release
+
+* 0.2	07/13/2006
+		Added ServiceGroup stuff
+
+This script may be used to schedule any type of downtime as long as the user has access to write to the
+nagios command file.  This works particularly nicely when used inside of a crontab to schedule recurring
+downtimes events.
+
+To configure the script, just change the NAGIOSCMD definition at the top of the script.
+
+Example Usage:
+
+* To schedule downtime for the PING service on localhost between midnight and 1am:
+
+nagios_down.php -h localhost -s PING -f -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_SVC_DOWNTIME)
+
+* To do the same, with a flexible downtime window:
+
+nagios_down.php -h localhost -s PING -d 3600 -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_SVC_DOWNTIME)
+
+* To schedule downtime for all services contained in a ServiceGroup:
+
+nagios_down.php -Ss -g servicegroup -f -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_SERVICEGROUP_SVC_DOWNTIME)
+
+* To schedule downtime for all hosts which have a service in ServiceGroup:
+
+nagios_down.php -Sh -g servicegroup -f -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_SERVICEGROUP_HOST_DOWNTIME)
+
+* To schedule downtime for all services on hosts in a HostGroup:
+
+nagios_down.php -Hs -g hostgroup -f -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_HOSTGROUP_SVC_DOWNTIME)
+
+* To schedule downtime for all services on a host, but not for the host itself:
+
+nagios_down.php -h localhost -s all -f -b midnight -e "01:00 tomorrow" -a Admin -c "Server Maintenance"
+(see SCHEDULE_HOST_SVC_DOWNTIME)
+
+For more information, please refer to the Nagios External Commands documentation @ 
+http://www.nagios.org/developerinfo/externalcommands/commandlist.php
+
+

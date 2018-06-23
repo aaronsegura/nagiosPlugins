@@ -1,0 +1,30 @@
+File size growth checking plugin for Nagios
+by Aaron Segura (aaron.segura@gmail.com)
+
+---------------------------------------
+
+Usage: check_log_growth.php -l <logfile> [-t <tmpdir>] -w <warning> -c <critical>
+
+		-l     Log file to monitor
+        -w     Bytes of growth warning threshold
+        -c     Bytes of growth critical threshold
+        -t     Directory to keep state files, defaults to /tmp
+
+---------------------------------------
+
+Revisions:
+
+* 0.1 - 09/04/2006
+        First working version
+
+* 0.2 - 09/12/2006
+        Overhaul to work without "monitor_file_growth.php" daemon
+
+* 0.3 - 10/05/2006
+        Initial Release
+        Added -t option 
+
+---------------------------------------
+
+Questions, comments, flames -> aaron.segura@gmail.com
+

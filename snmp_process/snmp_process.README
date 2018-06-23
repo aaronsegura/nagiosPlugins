@@ -1,0 +1,48 @@
+Check Running Processes via SNMP
+by Aaron Segura (aaron.segura@gmail.com)
+
+------------------------------
+snmp_process.php v0.2 (October 09, 2006), by Aaron M. Segura
+Usage: ./snmp_process.php -H <host> -n <comm> -p <process> [-a <args>]
+       [-c <min_critical>] [-C <max_critical>] 
+       [-w <min_warning>] [-W <max_warning>]
+
+	-H	Host to check
+	-n	Community Name
+	-p	Process Name (exact)
+	-a	Process Arguments (regex)
+	-c	Minimum Critical Threshold
+	-C	Maximum Critical Threshold
+	-w	Minimum Warning Threshold
+	-W	Maximum Warning Threshold
+------------------------------
+
+Revisions:
+* 0.1	09/12/2006
+		First working copy
+
+* 0.2	10/11/2006
+		Added -a option
+		Initial Release
+
+------------------------------
+
+-H <host> -n <comm> and -p <process> are REQUIRED arguments.  All other
+arguments are optional, and come with reasonable defaults.
+
+	$ snmp_process.php -H web_svr -n public -p httpd 
+
+	Will cause the script to check for at least one running httpd process
+
+	$ snmp_process.php -H app_svr -n public -p java -a SomeApp
+
+	Will cause the script to check for at least one running 'java' process
+		with 'SomeApp' in the argument line.
+
+	$ snmp_process.php -H web_svr -n public -p httpd -c 0 -w 5 -W 200 -C 225
+
+	Will cause the script to check for 5 < X < 200 processes.  A CRITICAL alarm
+		will be triggered if there are 0 or more than 225 processes, while a 
+		WARNING will be triggered if there are 1-5 or 200-225 processes running
+
+Pretty simple, no?  Comments, flames, suggestions -> aaron.segura@gmail.com

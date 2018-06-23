@@ -1,0 +1,43 @@
+SNMP Disk Usage Plugin for Nagios
+by Aaron Segura (aaron.segura@gmail.com)
+
+---------------------------------------
+
+Usage: snmp_disk.php -H <host> -n <community> -p <partition> -w <warning> \
+					 -c <critical> [-f <config>]
+
+        -H     Host to be checked
+        -n     SNMP Community Name
+        -p     Partition to be checked (must match exactly)
+        -w     Percent used warning threshold
+        -c     Percent used critical threshold
+        -f     Optional config file
+
+---------------------------------------
+
+Revisions:
+
+* 0.1 - 10/04/2006
+      Initial Release
+
+---------------------------------------
+
+Config File:
+
+	The optional config file will override any command line settings for
+warning or critical thresholds which are passed on the command line.  The
+format for the config file is simple:
+
+host:[partition]:warning:critical
+
+	'partition' is optional.  If you specify an entry with no specific
+partition, the definition will apply across all partitions on that host.
+You may specify a broad host-based definition as well as more specific
+partition-based definitions for the same host.  The more specific partition
+definitions will take precedence over the broader host-based definition.
+
+host::90:95
+host:/tmp:95:98
+
+Questions, comments, flames -> aaron.segura@gmail.com
+

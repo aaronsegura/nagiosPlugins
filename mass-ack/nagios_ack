@@ -1,0 +1,230 @@
+#!/usr/bin/php -q
+<?php
+
+define("CMDFILE", "/usr/local/groundwork/nagios/var/spool/nagios.cmd");
+define("STATEFILE", "/usr/local/groundwork/nagios/var/status.log");
+
+define("VERSION", "0.1");
+define("VERDATE", "11/16/2006");
+
+function usage($msg = NULL)
+{
+	global $argv0;
+
+	print(basename($argv0) ." v". VERSION ." (". VERDATE .") ");
+	print("by Aaron M. Segura (aaron.segura@gmail.com)\n");
+
+	print("\nUsage: ". basename($argv0) ." <all|<host [service|all]>> <msg>\n");
+	print("Acknowledge alarms for given Host[s] or Service[s].  Both 'host' and 'service'\n");
+	print("are treated as regular expressions, so be exact if you want to be exact.\n");
+	print("The keyword \"all\" may be used to perform sweeping acknowledgements of \n");
+	print("either all problems or all problems associated with a particular host.\n");
+
+	if ( strlen($msg) )
+		print("\n*** $msg\n\n");
+	
+	exit();
+}
+
+function write_command($file, $str)
+{
+	if ( ($fp = @fopen(CMDFILE, "a")) === FALSE )
+	{
+		print("Could not open command file.  Check your permissions\n");
+		return(FALSE);
+	}
+	else
+	{
+		fwrite($fp, "[". time() ."] $str\n");
+		fclose($fp);
+		return(TRUE);
+	}
+}
+
+function get_nagios_status($file)
+{
+	$status = array();
+
+	if ( file_exists($file) )	
+	{
+		$data = @file($file);
+
+		if ( count($data) == 1 )
+			return(FALSE);
+
+		foreach ( $data as $line )
+		{
+			$line = rtrim($line);
+
+			if ( preg_match('/^[A-Za-z]* \{/', $line) )
+			{
+				// section header
+				$key = split(" ", $line);
+				$index = $key[0];
+			}
+			else
+				if ( preg_match('/[a-z_A-Z]+=/', $line) )
+				{
+					$list = explode("=", trim($line));
+					$key = $list[0];
+					$val = implode("=", array_slice($list,1));
+
+					switch($index)
+					{
+						case "info":
+						case "program":
+							$status["$index"]["$key"] = $val;
+						break;
+
+						case "host":
+							if ( $key == "host_name" )
+							{
+								$status["hosts"][] = $val;
+								$status["$val"] = array();
+								$current_host = $val;
+							}
+							else
+								$status["$current_host"]["$key"] = $val;
+						break;
+
+						case "service":
+							switch($key)
+							{
+								case "host_name":
+									$current_host = $val;
+								break;
+
+								case "service_description":
+									$current_svc = $val;
+									$status["$current_host"]["services"][] = $val;
+									$status["$current_host"]["$val"] = array();
+								break;
+
+								default:
+									$status["$current_host"]["$current_svc"]["$key"] = $val;
+							}
+						break;	
+					}
+				}
+				else
+					if ( preg_match("/\}$/", $line) || preg_match("/^$/", $line) )
+						$current_host = $current_svc = NULL;
+		} // Foreach
+
+		return($status);
+
+	} // if (Status Log Exists)
+	else
+		return(NULL);
+} // end function
+
+	//
+	// main()
+	// 
+
+	// Read the current Nagios Status.
+	$nagios = get_nagios_status(STATEFILE);
+
+	if ( count($nagios) <= 1 )
+		usage("Unable to read nagios status from ". STATEFILE);
+
+	$argv0 = array_shift($_SERVER["argv"]);
+
+	switch($_SERVER["argc"])
+	{
+		// Minimum of 2 arguments + argv[0]
+		case "1":
+		case "2":
+			usage();
+		break;
+
+		case "3":
+			// Host
+			$host = array_shift($_SERVER["argv"]);
+			$msg  = array_shift($_SERVER["argv"]);
+
+			if ( eregi("^all$", $host ) )
+				$type = "ALL";
+			else
+				$type = "HOST";
+		break;
+
+		case "4":
+			// Service
+			$host = array_shift($_SERVER["argv"]);
+			$service = array_shift($_SERVER["argv"]);
+			$msg  = array_shift($_SERVER["argv"]);
+
+			if ( eregi("^all$", $service) )
+				$type = "HOST_ALL";
+			else
+				$type = "SVC";
+		break;
+
+		default:
+			usage();
+	}
+
+	// Make room for sudo!
+	$user = getenv("SUDO_USER");
+	if ( ! strlen($user) )
+		$user = getenv("USER");
+
+	foreach ( $nagios["hosts"] as $current_host )
+	{
+		// process hosts
+		if ( ereg("^HOST$|^ALL$", $type) )
+		{
+			if ( ereg("$host", $current_host) )
+			{
+				$str = "ACKNOWLEDGE_HOST_PROBLEM;$current_host;1;1;0;$user;$msg\n";
+				if ( ! write_command(CMDFILE, $str) )
+					exit(1);
+
+				$output .= "Acknowledged HOST Alarm on $current_host\n";
+			}
+			if ( ereg("^HOST$", $type) )
+				continue;
+		}
+
+		// process services
+		foreach( $nagios["$current_host"]["services"] as $current_svc )
+		{
+			switch($type)
+			{
+				case "HOST_ALL":
+				case "ALL":
+					if ( (ereg("$host", $current_host) || ereg("^ALL$", $type)) && 
+						($nagios["$current_host"]["$current_svc"]["current_state"] > 0) &&
+						($nagios["$current_host"]["$current_svc"]["problem_has_been_acknowledged"] == 0) )
+					{
+						$str = "ACKNOWLEDGE_SVC_PROBLEM;$current_host;$current_svc;1;1;0;$user;$msg\n";
+						if ( ! write_command(CMDFILE, $str) )
+							exit(1);
+
+						$output .= "Acknowledged SERVICE Alarm $current_host/$current_svc\n";
+					}
+				break;
+
+				case "SVC":
+					// echo "$host -> $current_host\t$service -> $current_svc\n";
+					if ( ereg("$host", $current_host) && ereg("$service", $current_svc)  &&
+						($nagios["$current_host"]["$current_svc"]["current_state"] > 0) &&
+						($nagios["$current_host"]["$current_svc"]["problem_has_been_acknowledged"] == 0) )
+					{
+						$str = "ACKNOWLEDGE_SVC_PROBLEM;$current_host;$current_svc;1;1;0;$user;$msg\n";
+						if ( ! write_command(CMDFILE, $str) )
+							exit(1);
+
+						$output .= "Acknowledged SERVICE Alarm $current_host/$current_svc\n";
+					}
+				break;
+			}
+		}
+	}
+
+	if ( strlen($output)  )
+		print($output);
+	else
+		print("No eligible hosts/services found.\n");
+?>

@@ -1,0 +1,59 @@
+Nagios Mass Acknowledger
+by Aaron Segura (aaron.segura@gmail.com)
+
+---------------------------------------
+
+nagios_ack <all|<host [service|all]>> <msg>
+
+---------------------------------------
+
+Revisions:
+
+* 0.1 - 11/16/2006
+      Initial Release
+
+---------------------------------------
+
+To Configure:
+
+Set the locaion of your nagios.cmd and status.log files in the define() 
+statements at the top of the script.
+
+---------------------------------------
+
+The usage line may seem confusing, but it really isn't.  Get over it.  The
+script takes either 2 or 3 arguments.  There are two possible modes of 
+operation in the 2-argument form.
+
+# nagios_ack all "Power Outage"
+
+Will acknowledge ALL host and service problems currently happening.
+
+# nagios_ack webprod01 "Power supply blew up"
+
+Will acknowledge the host alarm connected to any host matching the regular
+expression 'webprod01'.  
+
+In 3-argument form, specific services, or swaths of services can be
+acknowledged.
+
+# nagios_ack webprod01 httpd "Working on it"
+
+Will acknowledge any service alarm matching the regex 'httpd' happening on 
+any host matching the regex 'webprod01'.  In this way, it is trivial to 
+perform mass-acknowledgements.
+
+Say you have a farm of webservers called webprod01,webprod02 and webprod03.
+If you wanted to acknowledge a problem with the 'http' service on all of the
+hosts, you could:
+
+# nagios_ack web http "Web services are down.  psDOOM got out of hand"
+
+Tid-Bits:
+* The script takes either the $SUDO_USER or $USER and passes it to nagios as
+  the name of the user submitting the acknowledgement.
+* The <msg> parameter MUST be quoted if it contains whitespace.
+
+I realize the documentation is sparse, so ...
+
+Questions, comments, flames -> aaron.segura@gmail.com

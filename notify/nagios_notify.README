@@ -1,0 +1,116 @@
+Nagios Intelligent E-mail Notification v0.5
+by Aaron Segura (aaron.segura@gmail.com)
+
+------------------------------
+Usage: nagios_notify.php <-t template> <-c contact e-mail> <-f from> [-g TAG] [-x]
+-t      Template File
+-c      Contact E-mail
+-f		From Address
+-g		Subject Tag, will be prepended to subject line in template
+-x		Just print the message to stdout, do not mail
+------------------------------
+
+Revisions:
+* 0.1	07/12/2006
+		Initial Release
+
+* 0.2	07/13/2006
+		Added #ELSE syntax
+		Added -f and -g options (removed define()'s)
+		Added dynamic subject ability
+
+* 0.3	07/18/2006
+		Added -x switch, for piping output elsewhere
+
+* 0.4	08/30/2006
+		Added #EXEC and #INCLUDE logic
+
+* 0.4.1 09/06/2006
+		BugFix: Fixed #EXEC and #INCLUDE so they respect #IF/#ELSE Logic :/
+
+* 0.4.2 09/2/22006
+		BugFix: Fixed Nested #IF logic
+
+* 0.5   11/10/2008
+		Added #DIE logic
+
+This script will allow you to specify templates for dynamic notification
+creation rather than having to pack all of the macros and \n's into a 
+static nagios command.
+
+To configure:
+	Edit the TEMPLATEDIR defined at the top of the script to match the location
+	where you wil be stashing your templates.  This step is optional if you:
+	
+		1) Put your templates @ /usr/local/share/notify-templates/
+		   - or - 
+		2) Always specify absolute paths to your templates on the cmdline
+
+Use:
+	All cmdline arguments are required except -g, unless you are using the -x
+	option.  Then, only the -t option is required.
+
+	The -t argument can take either an absolute or relative path to the 
+	desired template.  You may specify relative paths relative to either the
+	current directory or the TEMPLATEDIR as defined at the top of the script.
+
+Templates:
+	The templates come in the form of:
+
+		SUBJECT
+		BODY
+		BODY
+		BODY
+		...
+
+	The script understands some basic flow control based on Nagios macros:
+
+		#IF MACRO=VALUE
+		Print This
+		#ELSE
+		Print This Instead
+		#ENDIF
+
+	Valid operators are: =,!=,>,<.>=,<= and ~= (perl regex)
+
+	The #DIE command may be used to abort notification entirely.  Please wrap
+	this with a #IF/#ENDIF if you want notifications to work at all.
+
+	Caveats:
+	*!* There can be no WHITESPACE around the operator.
+	*!* The first line of the PARSED template becomes the subject.
+		You *may* generate a dynamic subject line based on macro logic.
+
+	This template flow control allows you to do things like:
+
+	#IF NOTIFICATIONTYPE=ACKNOWLEDGEMENT
+	This problem has been acknowledged by $SERVICEACKAUTHOR$: $SERVICEACKCOMMENT$
+	#ELSE
+	#IF NOTIFICATIONNUMBER>=5
+	#IF NOTIFICATIONTYPE!=RECOVERY
+	*** PLEASE ACKNOWLEDGE THIS PROBLEM IF YOU ARE WORKING ON IT
+	#ENDIF
+	#ENDIF
+	#ENDIF 
+
+	-----
+	* New to v0.4
+	You may use #INCLUDE logic to include another file inside your template.
+	The included file will also be parsed for nagios macros and they will be
+	replaced with the appropriate information.
+
+	#INCLUDE /usr/local/etc/oncall
+
+	There is also new #EXEC logic.  Output from the specified program will be
+	parsed for nagios macros and be replaced by the appropriate value.
+
+	#EXEC /usr/local/etc/print_oncall_info
+	#EXEC cat /etc/shadow   ;)
+	-----
+
+	* New to v0.5
+	The #DIE command will completely abort the notification process
+
+	-----
+
+	Seeeeee?  Of course you do...Questions, comments, etc -> aaron.segura@gmail.com
